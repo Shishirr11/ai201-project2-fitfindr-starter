@@ -6,31 +6,46 @@ from utils.data_loader import load_listings
 load_dotenv()
 
 # Setup Groq client
-ai_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
-LLM_MODEL = "llama-3.3-70b-versatile"
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+MODEL_NAME = "llama-3.3-70b-versatile"
 
-def search_listings(description, size=None, max_price=None):
+def search_listings(
+    description: str,
+    size: str | None = None,
+    max_price: float | None = None,
+) -> list[dict]:
     listings = load_listings()
-    results = []
+    scored_results = []
     
+    # Clean up the description to find keywords
+    search_words = set(description.lower().split())
+
     for item in listings:
-        # Check if the price exceeds our limit
+        # Filter by price
         if max_price is not None and item.get("price", float('inf')) > max_price:
             continue
             
-        # Check if the size does not match
-        if size is not None and item.get("size") != size:
-            continue
-            
-        # Check if the description keyword is missing from both title and description
-        title_match = description.lower() in item.get("title", "").lower()
-        desc_match = description.lower() in item.get("description", "").lower()
-        if not title_match and not desc_match:
-            continue
-            
-        results.append(item)
+        # Filter by size (case-insensitive substring match as per docstring)
+        if size is not None:
+            item_size = item.get("size", "").lower()
+            if size.lower() not in item_size:
+                continue
+
+        # Score by keyword overlap in title and description
+        score = 0
+        text_to_search = (item.get("title", "") + " " + item.get("description", "")).lower()
         
-    return results
+        for word in search_words:
+            if word in text_to_search:
+                score += 1
+                
+        # Drop items with 0 score, otherwise keep them
+        if score > 0:
+            scored_results.append({"item": item, "score": score})
+
+    # Sort highest score first and return just the dictionaries
+    scored_results.sort(key=lambda x: x["score"], reverse=True)
+    return [result["item"] for result in scored_results]
 
 def suggest_outfit(new_item, wardrobe):
     # Graceful failure mode for an empty wardrobe

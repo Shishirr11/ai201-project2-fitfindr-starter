@@ -19,6 +19,8 @@ Usage (once implemented):
 """
 
 from tools import search_listings, suggest_outfit, create_fit_card
+from utils.data_loader import get_example_wardrobe
+import re
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -48,53 +50,33 @@ def _new_session(query: str, wardrobe: dict) -> dict:
 # ── planning loop ─────────────────────────────────────────────────────────────
 
 def run_agent(query: str, wardrobe: dict) -> dict:
-    """
-    Main agent entry point. Runs the FitFindr planning loop for a single
-    user interaction and returns the completed session dict.
-
-    Args:
-        query:    Natural language user request
-                  (e.g., "vintage graphic tee under $30, size M")
-        wardrobe: User's wardrobe dict — use get_example_wardrobe() or
-                  get_empty_wardrobe() from utils/data_loader.py
-
-    Returns:
-        The session dict after the interaction completes. Check session["error"]
-        first — if it is not None, the interaction ended early and the other
-        output fields (outfit_suggestion, fit_card) will be None.
-
-    TODO — implement this function using the planning loop you designed in planning.md:
-
-        Step 1: Initialize the session with _new_session().
-
-        Step 2: Parse the user's query to extract a description, size, and
-                max_price. You can use regex, string splitting, or ask the LLM
-                to parse it — document your choice in planning.md.
-                Store the result in session["parsed"].
-
-        Step 3: Call search_listings() with the parsed parameters.
-                Store results in session["search_results"].
-                If no results: set session["error"] to a helpful message and
-                return the session early. Do NOT proceed to suggest_outfit
-                with empty input.
-
-        Step 4: Select the item to use (e.g., the top result).
-                Store it in session["selected_item"].
-
-        Step 5: Call suggest_outfit() with the selected item and wardrobe.
-                Store the result in session["outfit_suggestion"].
-
-        Step 6: Call create_fit_card() with the outfit suggestion and selected item.
-                Store the result in session["fit_card"].
-
-        Step 7: Return the session.
-
-    Before writing code, complete the Planning Loop and State Management sections
-    of planning.md — your implementation should match what you described there.
-    """
-    # TODO: implement the planning loop
     session = _new_session(query, wardrobe)
-    session["error"] = "Planning loop not yet implemented."
+    
+    # Step 2: Parse the query using Regex
+    price_match = re.search(r'\$(\d+(?:\.\d{2})?)', query)
+    parsed_price = float(price_match.group(1)) if price_match else None
+    
+    size_match = re.search(r'size\s+([A-Za-z0-9]+)', query, re.IGNORECASE)
+    parsed_size = size_match.group(1).upper() if size_match else None
+    
+    session["parsed"] = {"description": query, "size": parsed_size, "max_price": parsed_price}
+    
+    # Step 3: Call search
+    session["search_results"] = search_listings(
+        description=session["parsed"]["description"],
+        size=session["parsed"]["size"],
+        max_price=session["parsed"]["max_price"]
+    )
+    
+    if not session["search_results"]:
+        session["error"] = "I couldn't find anything matching those filters. Try adjusting the size or price!"
+        return session
+        
+    # Step 4, 5 & 6: Process the top result
+    session["selected_item"] = session["search_results"][0]
+    session["outfit_suggestion"] = suggest_outfit(session["selected_item"], session["wardrobe"])
+    session["fit_card"] = create_fit_card(session["outfit_suggestion"], session["selected_item"])
+    
     return session
 
 

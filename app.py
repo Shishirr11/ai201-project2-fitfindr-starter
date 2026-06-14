@@ -13,38 +13,29 @@ but check your terminal — the port may differ).
 """
 
 import gradio as gr
-
 from agent import run_agent
+import json
 from utils.data_loader import get_example_wardrobe, get_empty_wardrobe
 
 
 # ── query handler ─────────────────────────────────────────────────────────────
 
 def handle_query(user_query: str, wardrobe_choice: str) -> tuple[str, str, str]:
-    """
-    Called by Gradio when the user submits a query.
-
-    Args:
-        user_query:     The text the user typed into the search box.
-        wardrobe_choice: Either "Example wardrobe" or "Empty wardrobe (new user)".
-
-    Returns:
-        A tuple of three strings:
-            (listing_text, outfit_suggestion, fit_card)
-        Each string maps to one of the three output panels in the UI.
-
-    TODO:
-        1. Guard against an empty query (return early with an error message).
-        2. Select the wardrobe based on wardrobe_choice.
-        3. Call run_agent() with the query and selected wardrobe.
-        4. If session["error"] is set, return the error in the first panel
-           and empty strings for the other two.
-        5. Otherwise, format session["selected_item"] into a readable listing_text
-           string and return it along with session["outfit_suggestion"] and
-           session["fit_card"].
-    """
-    # TODO: implement this function
-    return "Agent not yet implemented.", "", ""
+    if not user_query or not user_query.strip():
+        return "Please enter a search query.", "", ""
+        
+    if wardrobe_choice == "Example wardrobe":
+        wardrobe = get_example_wardrobe()
+    else:
+        wardrobe = get_empty_wardrobe()
+        
+    session = run_agent(user_query, wardrobe)
+    
+    if session.get("error"):
+        return session["error"], "", ""
+        
+    formatted_listing = json.dumps(session["selected_item"], indent=2)
+    return formatted_listing, session["outfit_suggestion"], session["fit_card"]
 
 
 # ── interface ─────────────────────────────────────────────────────────────────
