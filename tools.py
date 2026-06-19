@@ -2,6 +2,7 @@ import os
 from groq import Groq
 from dotenv import load_dotenv 
 from utils.data_loader import load_listings
+from typing import Optional
 
 load_dotenv()
 
@@ -11,8 +12,8 @@ MODEL_NAME = "llama-3.3-70b-versatile"
 
 def search_listings(
     description: str,
-    size: str | None = None,
-    max_price: float | None = None,
+    size:Optional[str] = None,
+    max_price: Optional[float] = None,
 ) -> list[dict]:
     listings = load_listings()
     scored_results = []
